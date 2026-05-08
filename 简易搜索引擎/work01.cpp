@@ -263,13 +263,14 @@ void searchByKeyword() {
 
 // ===================== 菜单 =====================
 void showMenu() {
-    printf("\n========== 简易搜索引擎 - 版本1 ==========\n");
+    printf("\n========== 简易搜索引擎 - 版本2 ==========\n");
     printf("1. 新增文档\n");
     printf("2. 查看所有文档\n");
     printf("3. 修改文档\n");
     printf("4. 删除文档\n");
     printf("5. 保存文档到文件\n");
     printf("6. 从文件加载文档\n");
+    printf("7. 关键词检索 （新增）\n")
     printf("0. 退出程序\n");
     printf("=========================================\n");
     printf("请输入操作序号：");
@@ -292,6 +293,7 @@ int main() {
             case 4: deleteDoc(); break;
             case 5: saveDocsToFile(); break;
             case 6: loadDocsFromFile(); break;
+            case 7: searchByKeyword(); break;
             case 0:
                 printf("?? 程序退出\n");
                 return 0;
