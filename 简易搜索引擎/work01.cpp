@@ -1,36 +1,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// ===================== ÅäÖÃ³£Á¿ =====================
-#define MAX_DOCS 100       // ×î´óÎÄµµÊıÁ¿
-#define MAX_ID_LEN 20      // ÎÄµµID×î´ó³¤¶È
-#define MAX_TITLE_LEN 100  // ±êÌâ×î´ó³¤¶È
-#define MAX_CONTENT_LEN 1000 // ÄÚÈİ×î´ó³¤¶È
-#define FILE_NAME "docs.txt" // Êı¾İ´æ´¢ÎÄ¼ş
+// ===================== é…ç½®å¸¸é‡ =====================
+#define MAX_DOCS 100       // æœ€å¤§æ–‡æ¡£æ•°é‡
+#define MAX_ID_LEN 20      // æ–‡æ¡£IDæœ€å¤§é•¿åº¦
+#define MAX_TITLE_LEN 100  // æ ‡é¢˜æœ€å¤§é•¿åº¦
+#define MAX_CONTENT_LEN 1000 // å†…å®¹æœ€å¤§é•¿åº¦
+#define MAX_KEY_LEN 50     // å…³é”®è¯æœ€å¤§é•¿åº¦
+#define FILE_NAME "docs.txt" // æ•°æ®å­˜å‚¨æ–‡ä»¶
 
-// ===================== ºËĞÄÊı¾İ½á¹¹ =====================
-// ÎÄµµ½á¹¹Ìå£¨°æ±¾1¹Ø¼üÊı¾İ½á¹¹£©
+// ===================== æ ¸å¿ƒæ•°æ®ç»“æ„ =====================
+// æ–‡æ¡£ç»“æ„ä½“ï¼ˆç‰ˆæœ¬1å…³é”®æ•°æ®ç»“æ„ï¼‰
 typedef struct {
-    char id[MAX_ID_LEN];       // ÎÄµµÎ¨Ò»±êÊ¶
-    char title[MAX_TITLE_LEN]; // ÎÄµµ±êÌâ
-    char content[MAX_CONTENT_LEN]; // ÎÄµµÄÚÈİ
+    char id[MAX_ID_LEN];       // æ–‡æ¡£å”¯ä¸€æ ‡è¯†
+    char title[MAX_TITLE_LEN]; // æ–‡æ¡£æ ‡é¢˜
+    char content[MAX_CONTENT_LEN]; // æ–‡æ¡£å†…å®¹
 } Document;
 
-// ÎÄµµ¿â£º´æ´¢ËùÓĞÎÄµµ + µ±Ç°ÎÄµµÊıÁ¿
+// æ–‡æ¡£åº“ï¼šå­˜å‚¨æ‰€æœ‰æ–‡æ¡£ + å½“å‰æ–‡æ¡£æ•°é‡
 struct {
     Document docs[MAX_DOCS];
-    int count; // µ±Ç°ÓĞĞ§ÎÄµµÊı
+    int count; // å½“å‰æœ‰æ•ˆæ–‡æ¡£æ•°
 } DocLibrary;
 
-// ===================== ×Ô¶¨Òå¹¤¾ßº¯Êı£¨ÎŞSTL£© =====================
-// ¼ÆËã×Ö·û´®³¤¶È
+// ===================== è‡ªå®šä¹‰å·¥å…·å‡½æ•°ï¼ˆæ— STLï¼‰ =====================
+// è®¡ç®—å­—ç¬¦ä¸²é•¿åº¦
 int myStrlen(const char* str) {
     int len = 0;
     while (str[len] != '\0') len++;
     return len;
 }
 
-// ×Ö·û´®¸´ÖÆ
+// å­—ç¬¦ä¸²å¤åˆ¶
 void myStrcpy(char* dest, const char* src) {
     int i = 0;
     while (src[i] != '\0') {
@@ -40,7 +41,7 @@ void myStrcpy(char* dest, const char* src) {
     dest[i] = '\0';
 }
 
-// ×Ö·û´®±È½Ï£¨ÏàµÈ·µ»Ø0£¬²»µÈ·µ»Ø·Ç0£©
+// å­—ç¬¦ä¸²æ¯”è¾ƒï¼ˆç›¸ç­‰è¿”å›0ï¼Œä¸ç­‰è¿”å›é0ï¼‰
 int myStrcmp(const char* a, const char* b) {
     int i = 0;
     while (a[i] != '\0' && b[i] != '\0') {
@@ -50,13 +51,35 @@ int myStrcmp(const char* a, const char* b) {
     return myStrlen(a) - myStrlen(b);
 }
 
-// ===================== ÎÄµµ¿âºËĞÄ¹¦ÄÜ =====================
-// 1. ³õÊ¼»¯ÎÄµµ¿â
+// ===================== ç‰ˆæœ¬2 æ–°å¢ï¼šå­ä¸²åŒ¹é…ï¼ˆåˆ¤æ–­æ˜¯å¦åŒ…å«å…³é”®è¯ï¼‰ =====================
+// åŠŸèƒ½ï¼šåœ¨textä¸­æŸ¥æ‰¾keywordï¼Œæ‰¾åˆ°è¿”å›1ï¼Œæ‰¾ä¸åˆ°è¿”å›0
+int containsKey(const char* text, const char* keyword) {
+    int textLen = myStrlen(text);
+    int keyLen = myStrlen(keyword);
+
+    if (keyLen == 0 || keyLen > textLen) return 0;
+
+    // æœ´ç´ åŒ¹é…ç®—æ³•
+    for (int i = 0; i <= textLen - keyLen; i++) {
+        int match = 1;
+        for (int j = 0; j < keyLen; j++) {
+            if (text[i + j] != keyword[j]) {
+                match = 0;
+                break;
+            }
+        }
+        if (match == 1) return 1;
+    }
+    return 0;
+}
+
+// ===================== æ–‡æ¡£åº“æ ¸å¿ƒåŠŸèƒ½ =====================
+// 1. åˆå§‹åŒ–æ–‡æ¡£åº“
 void initLibrary() {
     DocLibrary.count = 0;
 }
 
-// 2. ¸ù¾İID²éÕÒÎÄµµ£¬·µ»ØÏÂ±ê£¬ÕÒ²»µ½·µ»Ø-1
+// 2. æ ¹æ®IDæŸ¥æ‰¾æ–‡æ¡£ï¼Œè¿”å›ä¸‹æ ‡ï¼Œæ‰¾ä¸åˆ°è¿”å›-1
 int findDocById(const char* id) {
     for (int i = 0; i < DocLibrary.count; i++) {
         if (myStrcmp(DocLibrary.docs[i].id, id) == 0) {
@@ -66,103 +89,103 @@ int findDocById(const char* id) {
     return -1;
 }
 
-// 3. Ìí¼ÓÎÄµµ
+// 3. æ·»åŠ æ–‡æ¡£
 void addDoc() {
     if (DocLibrary.count >= MAX_DOCS) {
-        printf("? ÎÄµµ¿âÒÑÂú£¬ÎŞ·¨Ìí¼Ó£¡\n");
+        printf("? æ–‡æ¡£åº“å·²æ»¡ï¼Œæ— æ³•æ·»åŠ ï¼\n");
         return;
     }
 
     Document newDoc;
-    printf("===== ĞÂÔöÎÄµµ =====\n");
-    printf("ÇëÊäÈëÎÄµµID£º");
+    printf("===== æ–°å¢æ–‡æ¡£ =====\n");
+    printf("è¯·è¾“å…¥æ–‡æ¡£IDï¼š");
     scanf("%s", newDoc.id);
-    getchar(); // ÎüÊÕ»Ø³µ
+    getchar(); // å¸æ”¶å›è½¦
 
-    // ÅĞ¶ÏIDÊÇ·ñÖØ¸´
+    // åˆ¤æ–­IDæ˜¯å¦é‡å¤
     if (findDocById(newDoc.id) != -1) {
-        printf("? ÎÄµµIDÒÑ´æÔÚ£¡\n");
+        printf("? æ–‡æ¡£IDå·²å­˜åœ¨ï¼\n");
         return;
     }
 
-    printf("ÇëÊäÈëÎÄµµ±êÌâ£º");
+    printf("è¯·è¾“å…¥æ–‡æ¡£æ ‡é¢˜ï¼š");
     fgets(newDoc.title, MAX_TITLE_LEN, stdin);
-    printf("ÇëÊäÈëÎÄµµÄÚÈİ£º");
+    printf("è¯·è¾“å…¥æ–‡æ¡£å†…å®¹ï¼š");
     fgets(newDoc.content, MAX_CONTENT_LEN, stdin);
 
-    // ´æÈëÎÄµµ¿â
+    // å­˜å…¥æ–‡æ¡£åº“
     DocLibrary.docs[DocLibrary.count] = newDoc;
     DocLibrary.count++;
-    printf("? ÎÄµµÌí¼Ó³É¹¦£¡\n");
+    printf("? æ–‡æ¡£æ·»åŠ æˆåŠŸï¼\n");
 }
 
-// 4. ²é¿´ËùÓĞÎÄµµ
+// 4. æŸ¥çœ‹æ‰€æœ‰æ–‡æ¡£
 void showAllDocs() {
     if (DocLibrary.count == 0) {
-        printf("?? ÎÄµµ¿âÎª¿Õ£¡\n");
+        printf("?? æ–‡æ¡£åº“ä¸ºç©ºï¼\n");
         return;
     }
 
-    printf("\n===== ËùÓĞÎÄµµ£¨¹²%dÆª£©=====\n", DocLibrary.count);
+    printf("\n===== æ‰€æœ‰æ–‡æ¡£ï¼ˆå…±%dç¯‡ï¼‰=====\n", DocLibrary.count);
     for (int i = 0; i < DocLibrary.count; i++) {
-        printf("µÚ%dÆª\n", i + 1);
-        printf("ID£º%s\n", DocLibrary.docs[i].id);
-        printf("±êÌâ£º%s", DocLibrary.docs[i].title);
-        printf("ÄÚÈİ£º%s", DocLibrary.docs[i].content);
+        printf("ç¬¬%dç¯‡\n", i + 1);
+        printf("IDï¼š%s\n", DocLibrary.docs[i].id);
+        printf("æ ‡é¢˜ï¼š%s", DocLibrary.docs[i].title);
+        printf("å†…å®¹ï¼š%s", DocLibrary.docs[i].content);
         printf("------------------------\n");
     }
 }
 
-// 5. ĞŞ¸ÄÎÄµµ
+// 5. ä¿®æ”¹æ–‡æ¡£
 void modifyDoc() {
     char id[MAX_ID_LEN];
-    printf("ÇëÊäÈëÒªĞŞ¸ÄµÄÎÄµµID£º");
+    printf("è¯·è¾“å…¥è¦ä¿®æ”¹çš„æ–‡æ¡£IDï¼š");
     scanf("%s", id);
     int idx = findDocById(id);
 
     if (idx == -1) {
-        printf("? Î´ÕÒµ½¸ÃÎÄµµ£¡\n");
+        printf("? æœªæ‰¾åˆ°è¯¥æ–‡æ¡£ï¼\n");
         return;
     }
 
     getchar();
-    printf("===== ĞŞ¸ÄÎÄµµ =====\n");
-    printf("ÇëÊäÈëĞÂ±êÌâ£º");
+    printf("===== ä¿®æ”¹æ–‡æ¡£ =====\n");
+    printf("è¯·è¾“å…¥æ–°æ ‡é¢˜ï¼š");
     fgets(DocLibrary.docs[idx].title, MAX_TITLE_LEN, stdin);
-    printf("ÇëÊäÈëĞÂÄÚÈİ£º");
+    printf("è¯·è¾“å…¥æ–°å†…å®¹ï¼š");
     fgets(DocLibrary.docs[idx].content, MAX_CONTENT_LEN, stdin);
-    printf("? ĞŞ¸Ä³É¹¦£¡\n");
+    printf("? ä¿®æ”¹æˆåŠŸï¼\n");
 }
 
-// 6. É¾³ıÎÄµµ
+// 6. åˆ é™¤æ–‡æ¡£
 void deleteDoc() {
     char id[MAX_ID_LEN];
-    printf("ÇëÊäÈëÒªÉ¾³ıµÄÎÄµµID£º");
+    printf("è¯·è¾“å…¥è¦åˆ é™¤çš„æ–‡æ¡£IDï¼š");
     scanf("%s", id);
     int idx = findDocById(id);
 
     if (idx == -1) {
-        printf("? Î´ÕÒµ½¸ÃÎÄµµ£¡\n");
+        printf("? æœªæ‰¾åˆ°è¯¥æ–‡æ¡£ï¼\n");
         return;
     }
 
-    // ºóÃæµÄÎÄµµÏòÇ°¸²¸Ç
+    // åé¢çš„æ–‡æ¡£å‘å‰è¦†ç›–
     for (int i = idx; i < DocLibrary.count - 1; i++) {
         DocLibrary.docs[i] = DocLibrary.docs[i + 1];
     }
     DocLibrary.count--;
-    printf("? É¾³ı³É¹¦£¡\n");
+    printf("? åˆ é™¤æˆåŠŸï¼\n");
 }
 
-// 7. ±£´æÎÄµµµ½ÎÄ¼ş
+// 7. ä¿å­˜æ–‡æ¡£åˆ°æ–‡ä»¶
 void saveDocsToFile() {
     FILE* fp = fopen(FILE_NAME, "w");
     if (!fp) {
-        printf("? ÎÄ¼ş´ò¿ªÊ§°Ü£¡\n");
+        printf("? æ–‡ä»¶æ‰“å¼€å¤±è´¥ï¼\n");
         return;
     }
 
-    // Ğ´ÈëÊıÁ¿ + Ã¿ÆªÎÄµµ
+    // å†™å…¥æ•°é‡ + æ¯ç¯‡æ–‡æ¡£
     fprintf(fp, "%d\n", DocLibrary.count);
     for (int i = 0; i < DocLibrary.count; i++) {
         fprintf(fp, "%s\n", DocLibrary.docs[i].id);
@@ -171,24 +194,24 @@ void saveDocsToFile() {
     }
 
     fclose(fp);
-    printf("? ÒÑ±£´æµ½ %s\n", FILE_NAME);
+    printf("? å·²ä¿å­˜åˆ° %s\n", FILE_NAME);
 }
 
-// 8. ´ÓÎÄ¼ş¼ÓÔØÎÄµµ
+// 8. ä»æ–‡ä»¶åŠ è½½æ–‡æ¡£
 void loadDocsFromFile() {
     FILE* fp = fopen(FILE_NAME, "r");
     if (!fp) {
-        printf("?? Î´ÕÒµ½Êı¾İÎÄ¼ş£¬´´½¨ĞÂ¿â\n");
+        printf("?? æœªæ‰¾åˆ°æ•°æ®æ–‡ä»¶ï¼Œåˆ›å»ºæ–°åº“\n");
         return;
     }
 
-    // ¶ÁÈ¡ÊıÁ¿
+    // è¯»å–æ•°é‡
     fscanf(fp, "%d", &DocLibrary.count);
     getchar();
 
     for (int i = 0; i < DocLibrary.count; i++) {
         fgets(DocLibrary.docs[i].id, MAX_ID_LEN, fp);
-        // È¥³ı»»ĞĞ
+        // å»é™¤æ¢è¡Œ
         DocLibrary.docs[i].id[myStrlen(DocLibrary.docs[i].id) - 1] = '\0';
 
         fgets(DocLibrary.docs[i].title, MAX_TITLE_LEN, fp);
@@ -196,27 +219,66 @@ void loadDocsFromFile() {
     }
 
     fclose(fp);
-    printf("? ´ÓÎÄ¼ş¼ÓÔØ³É¹¦£¡\n");
+    printf("? ä»æ–‡ä»¶åŠ è½½æˆåŠŸï¼\n");
 }
 
-// ===================== ²Ëµ¥ =====================
+// ===================== ç‰ˆæœ¬2 æ–°å¢ï¼šå…³é”®è¯æ£€ç´¢åŠŸèƒ½ =====================
+void searchByKeyword() {
+    char key[MAX_KEY_LEN];
+    printf("===== å…³é”®è¯æ£€ç´¢ =====\n");
+    printf("è¯·è¾“å…¥è¦æœç´¢çš„å…³é”®è¯ï¼š");
+    getchar();
+    fgets(key, MAX_KEY_LEN, stdin);
+
+    // å»æ‰fgetsè¯»å–çš„æ¢è¡Œç¬¦
+    int len = myStrlen(key);
+    if (len > 0 && key[len - 1] == '\n') {
+        key[len - 1] = '\0';
+    }
+
+    int matchCount = 0;
+    printf("\n===== æ£€ç´¢ç»“æœ =====\n");
+
+    for (int i = 0; i < DocLibrary.count; i++) {
+        // åŒæ—¶åŒ¹é…æ ‡é¢˜å’Œå†…å®¹
+        int titleMatch = containsKey(DocLibrary.docs[i].title, key);
+        int contentMatch = containsKey(DocLibrary.docs[i].content, key);
+
+        if (titleMatch || contentMatch) {
+            matchCount++;
+            printf("åŒ¹é…æ–‡æ¡£ %d\n", matchCount);
+            printf("IDï¼š%s\n", DocLibrary.docs[i].id);
+            printf("æ ‡é¢˜ï¼š%s", DocLibrary.docs[i].title);
+            printf("å†…å®¹ï¼š%s", DocLibrary.docs[i].content);
+            printf("------------------------\n");
+        }
+    }
+
+    if (matchCount == 0) {
+        printf("?? æœªæ‰¾åˆ°åŒ…å«å…³é”®è¯ã€Œ%sã€çš„æ–‡æ¡£\n", key);
+    } else {
+        printf("? å…±æ‰¾åˆ° %d ç¯‡åŒ¹é…æ–‡æ¡£\n", matchCount);
+    }
+}
+
+// ===================== èœå• =====================
 void showMenu() {
-    printf("\n========== ¼òÒ×ËÑË÷ÒıÇæ - °æ±¾1 ==========\n");
-    printf("1. ĞÂÔöÎÄµµ\n");
-    printf("2. ²é¿´ËùÓĞÎÄµµ\n");
-    printf("3. ĞŞ¸ÄÎÄµµ\n");
-    printf("4. É¾³ıÎÄµµ\n");
-    printf("5. ±£´æÎÄµµµ½ÎÄ¼ş\n");
-    printf("6. ´ÓÎÄ¼ş¼ÓÔØÎÄµµ\n");
-    printf("0. ÍË³ö³ÌĞò\n");
+    printf("\n========== ç®€æ˜“æœç´¢å¼•æ“ - ç‰ˆæœ¬1 ==========\n");
+    printf("1. æ–°å¢æ–‡æ¡£\n");
+    printf("2. æŸ¥çœ‹æ‰€æœ‰æ–‡æ¡£\n");
+    printf("3. ä¿®æ”¹æ–‡æ¡£\n");
+    printf("4. åˆ é™¤æ–‡æ¡£\n");
+    printf("5. ä¿å­˜æ–‡æ¡£åˆ°æ–‡ä»¶\n");
+    printf("6. ä»æ–‡ä»¶åŠ è½½æ–‡æ¡£\n");
+    printf("0. é€€å‡ºç¨‹åº\n");
     printf("=========================================\n");
-    printf("ÇëÊäÈë²Ù×÷ĞòºÅ£º");
+    printf("è¯·è¾“å…¥æ“ä½œåºå·ï¼š");
 }
 
-// ===================== Ö÷º¯Êı =====================
+// ===================== ä¸»å‡½æ•° =====================
 int main() {
     initLibrary();
-    loadDocsFromFile(); // Æô¶¯×Ô¶¯¼ÓÔØ
+    loadDocsFromFile(); // å¯åŠ¨è‡ªåŠ¨åŠ è½½
 
     int choice;
     while (1) {
@@ -231,10 +293,10 @@ int main() {
             case 5: saveDocsToFile(); break;
             case 6: loadDocsFromFile(); break;
             case 0:
-                printf("?? ³ÌĞòÍË³ö\n");
+                printf("?? ç¨‹åºé€€å‡º\n");
                 return 0;
             default:
-                printf("? ÊäÈë´íÎó£¬ÇëÖØÊÔ£¡\n");
+                printf("? è¾“å…¥é”™è¯¯ï¼Œè¯·é‡è¯•ï¼\n");
         }
     }
     return 0;
