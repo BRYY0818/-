@@ -124,6 +124,55 @@ int matchAnyKey(Document doc, char keys[MAX_KEY_NUM][MAX_KEY_LEN], int keyNum) {
     return 0;
 }
 
+// 多关键词检索入口
+void searchMultiKey() {
+    char input[500];
+    char keys[MAX_KEY_NUM][MAX_KEY_LEN];
+
+    printf("\n===== 多关键词检索 =====\n");
+    printf("请输入多个关键词，用空格分隔：\n");
+    getchar();
+    fgets(input, 500, stdin);
+
+    int keyNum = splitKeys(input, keys);
+    if (keyNum <= 0) {
+        printf("未输入有效关键词！\n");
+        return;
+    }
+
+    int mode;
+    printf("请选择检索模式：\n");
+    printf("1-与检索(包含所有关键词)  2-或检索(包含任意一个)\n");
+    scanf("%d", &mode);
+
+    int matchCount = 0;
+    printf("\n===== 检索结果 =====\n");
+
+    for (int i = 0; i < DocLibrary.count; i++) {
+        int res = 0;
+        if (mode == 1) {
+            res = matchAllKeys(DocLibrary.docs[i], keys, keyNum);
+        } else if (mode == 2) {
+            res = matchAnyKey(DocLibrary.docs[i], keys, keyNum);
+        }
+
+        if (res) {
+            matchCount++;
+            printf("匹配文档 %d\n", matchCount);
+            printf("ID：%s\n", DocLibrary.docs[i].id);
+            printf("标题：%s", DocLibrary.docs[i].title);
+            printf("内容：%s", DocLibrary.docs[i].content);
+            printf("------------------------\n");
+        }
+    }
+
+    if (matchCount == 0) {
+        printf("未找到匹配文档\n");
+    } else {
+        printf("共找到 %d 篇匹配文档\n", matchCount);
+    }
+}
+
 // ===================== 文档库核心功能 =====================
 // 1. 初始化文档库
 void initLibrary() {
