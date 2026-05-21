@@ -7,6 +7,7 @@
 #define MAX_TITLE_LEN 100  // 标题最大长度
 #define MAX_CONTENT_LEN 1000 // 内容最大长度
 #define MAX_KEY_LEN 50     // 关键词最大长度
+#define MAX_KEY_NUM 10     // 最多支持10个关键词
 #define FILE_NAME "docs.txt" // 数据存储文件
 
 // ===================== 核心数据结构 =====================
@@ -69,6 +70,56 @@ int containsKey(const char* text, const char* keyword) {
             }
         }
         if (match == 1) return 1;
+    }
+    return 0;
+}
+
+// ===================== 版本3 新增：按空格分割多个关键词 =====================
+// input：输入整行字符串 keys：存放分割后的关键词数组 返回关键词个数
+int splitKeys(char* input, char keys[MAX_KEY_NUM][MAX_KEY_LEN]) {
+    int cnt = 0;
+    int idx = 0;
+    int len = myStrlen(input);
+
+    for (int i = 0; i < len && cnt < MAX_KEY_NUM; i++) {
+        if (input[i] == ' ' || input[i] == '\n') {
+            if (idx > 0) {
+                keys[cnt][idx] = '\0';
+                cnt++;
+                idx = 0;
+            }
+        } else {
+            keys[cnt][idx++] = input[i];
+        }
+    }
+    // 处理最后一个关键词
+    if (idx > 0 && cnt < MAX_KEY_NUM) {
+        keys[cnt][idx] = '\0';
+        cnt++;
+    }
+    return cnt;
+}
+
+// 判断一篇文档是否匹配所有关键词（AND）
+int matchAllKeys(Document doc, char keys[MAX_KEY_NUM][MAX_KEY_LEN], int keyNum) {
+    for (int k = 0; k < keyNum; k++) {
+        int inTitle = containsKey(doc.title, keys[k]);
+        int inCont = containsKey(doc.content, keys[k]);
+        if (!inTitle && !inCont) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+// 判断一篇文档是否匹配任意关键词（OR）
+int matchAnyKey(Document doc, char keys[MAX_KEY_NUM][MAX_KEY_LEN], int keyNum) {
+    for (int k = 0; k < keyNum; k++) {
+        int inTitle = containsKey(doc.title, keys[k]);
+        int inCont = containsKey(doc.content, keys[k]);
+        if (inTitle || inCont) {
+            return 1;
+        }
     }
     return 0;
 }
@@ -270,7 +321,8 @@ void showMenu() {
     printf("4. 删除文档\n");
     printf("5. 保存文档到文件\n");
     printf("6. 从文件加载文档\n");
-    printf("7. 关键词检索 （新增）\n")
+    printf("7. 关键词检索 （新增）\n")；
+    printf("8. 多关键词检索\n");
     printf("0. 退出程序\n");
     printf("=========================================\n");
     printf("请输入操作序号：");
@@ -294,6 +346,7 @@ int main() {
             case 5: saveDocsToFile(); break;
             case 6: loadDocsFromFile(); break;
             case 7: searchByKeyword(); break;
+            case 8: searchMultiKey();break;
             case 0:
                 printf("?? 程序退出\n");
                 return 0;
