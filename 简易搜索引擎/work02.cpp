@@ -299,384 +299,267 @@ void indexSearch() {
     printf("共匹配：%d\n", matchCount);
 }
 
-// ===================== 自定义工具函数（无STL） =====================
-// 计算字符串长度
-int myStrlen(const char* str) {
-    int len = 0;
-    while (str[len] != '\0') len++;
-    return len;
-}
-
-// 字符串复制
-void myStrcpy(char* dest, const char* src) {
-    int i = 0;
-    while (src[i] != '\0') {
-        dest[i] = src[i];
-        i++;
-    }
-    dest[i] = '\0';
-}
-
-// 字符串比较（相等返回0，不等返回非0）
-int myStrcmp(const char* a, const char* b) {
-    int i = 0;
-    while (a[i] != '\0' && b[i] != '\0') {
-        if (a[i] != b[i]) return a[i] - b[i];
-        i++;
-    }
-    return myStrlen(a) - myStrlen(b);
-}
-
-// ===================== 版本2 新增：子串匹配（判断是否包含关键词） =====================
-// 功能：在text中查找keyword，找到返回1，找不到返回0
-int containsKey(const char* text, const char* keyword) {
-    int textLen = myStrlen(text);
-    int keyLen = myStrlen(keyword);
-
-    if (keyLen == 0 || keyLen > textLen) return 0;
-
-    // 朴素匹配算法
-    for (int i = 0; i <= textLen - keyLen; i++) {
-        int match = 1;
-        for (int j = 0; j < keyLen; j++) {
-            if (text[i + j] != keyword[j]) {
-                match = 0;
-                break;
+// ===================== 版本4 新增：检索效率对比测试 =====================
+void testSearchPerformance() {
+    // 先重建索引
+    rebuildIndex();
+    
+    // 构造测试关键词
+    char keys[MAX_KEY_NUM][MAX_KEY_LEN] = {"a", "b", "c"};
+    int keyNum = 3;
+    
+    clock_t start, end;
+    long t1, t2;
+    
+    printf("\n===== 线性检索 VS 倒排索引检索 效率对比 =====\n");
+    printf("测试文档数：%d\n", DocLibrary.count);
+    printf("测试关键词数：%d\n", keyNum);
+    
+    // 测试线性检索（版本3方式）
+    start = clock();
+    for (int i = 0; i < 1000; i++) {
+        int cnt = 0;
+        for (int d = 0; d < DocLibrary.count; d++) {
+            int match = 1;
+            for (int k = 0; k < keyNum; k++) {
+                if (!KMP(DocLibrary.docs[d].title, keys[k]) && !KMP(DocLibrary.docs[d].content, keys[k])) {
+                    match = 0;
+                    break;
+                }
             }
-        }
-        if (match == 1) return 1;
-    }
-    return 0;
-}
-
-// ===================== 版本3 新增：按空格分割多个关键词 =====================
-// input：输入整行字符串 keys：存放分割后的关键词数组 返回关键词个数
-int splitKeys(char* input, char keys[MAX_KEY_NUM][MAX_KEY_LEN]) {
-    int cnt = 0;
-    int idx = 0;
-    int len = myStrlen(input);
-
-    for (int i = 0; i < len && cnt < MAX_KEY_NUM; i++) {
-        if (input[i] == ' ' || input[i] == '\n') {
-            if (idx > 0) {
-                keys[cnt][idx] = '\0';
-                cnt++;
-                idx = 0;
-            }
-        } else {
-            keys[cnt][idx++] = input[i];
+            if (match) cnt++;
         }
     }
-    // 处理最后一个关键词
-    if (idx > 0 && cnt < MAX_KEY_NUM) {
-        keys[cnt][idx] = '\0';
-        cnt++;
+    end = clock();
+    t1 = end - start;
+    printf("线性检索耗时：%ld\n", t1);
+    
+    // 测试倒排索引检索
+    start = clock();
+    for (int i = 0; i < 1000; i++) {
+        int result[MAX_DOCS];
+        int cnt = indexSearchAnd(keys, keyNum, result, MAX_DOCS);
     }
-    return cnt;
-}
-
-// 判断一篇文档是否匹配所有关键词（AND）
-int matchAllKeys(Document doc, char keys[MAX_KEY_NUM][MAX_KEY_LEN], int keyNum) {
-    for (int k = 0; k < keyNum; k++) {
-        int inTitle = containsKey(doc.title, keys[k]);
-        int inCont = containsKey(doc.content, keys[k]);
-        if (!inTitle && !inCont) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-// 判断一篇文档是否匹配任意关键词（OR）
-int matchAnyKey(Document doc, char keys[MAX_KEY_NUM][MAX_KEY_LEN], int keyNum) {
-    for (int k = 0; k < keyNum; k++) {
-        int inTitle = containsKey(doc.title, keys[k]);
-        int inCont = containsKey(doc.content, keys[k]);
-        if (inTitle || inCont) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-// 多关键词检索入口
-void searchMultiKey() {
-    char input[500];
-    char keys[MAX_KEY_NUM][MAX_KEY_LEN];
-
-    printf("\n===== 多关键词检索 =====\n");
-    printf("请输入多个关键词，用空格分隔：\n");
-    getchar();
-    fgets(input, 500, stdin);
-
-    int keyNum = splitKeys(input, keys);
-    if (keyNum <= 0) {
-        printf("未输入有效关键词！\n");
-        return;
-    }
-
-    int mode;
-    printf("请选择检索模式：\n");
-    printf("1-与检索(包含所有关键词)  2-或检索(包含任意一个)\n");
-    scanf("%d", &mode);
-
-    int matchCount = 0;
-    printf("\n===== 检索结果 =====\n");
-
-    for (int i = 0; i < DocLibrary.count; i++) {
-        int res = 0;
-        if (mode == 1) {
-            res = matchAllKeys(DocLibrary.docs[i], keys, keyNum);
-        } else if (mode == 2) {
-            res = matchAnyKey(DocLibrary.docs[i], keys, keyNum);
-        }
-
-        if (res) {
-            matchCount++;
-            printf("匹配文档 %d\n", matchCount);
-            printf("ID：%s\n", DocLibrary.docs[i].id);
-            printf("标题：%s", DocLibrary.docs[i].title);
-            printf("内容：%s", DocLibrary.docs[i].content);
-            printf("------------------------\n");
-        }
-    }
-
-    if (matchCount == 0) {
-        printf("未找到匹配文档\n");
+    end = clock();
+    t2 = end - start;
+    printf("倒排索引检索耗时：%ld\n", t2);
+    
+    if (t2 < t1) {
+        double speedup = (double)t1 / t2;
+        printf("? 结论：倒排索引速度提升 %.1f 倍！\n", speedup);
     } else {
-        printf("共找到 %d 篇匹配文档\n", matchCount);
+        printf("?  结论：文档量过少时，索引优势不明显\n");
     }
 }
 
-// ===================== 文档库核心功能 =====================
-// 1. 初始化文档库
-void initLibrary() {
-    DocLibrary.count = 0;
-}
+// ------------------------------
+// 原有文档管理功能（已适配索引更新）
+// ------------------------------
+void initLibrary() { DocLibrary.count = 0; }
 
-// 2. 根据ID查找文档，返回下标，找不到返回-1
 int findDocById(const char* id) {
-    for (int i = 0; i < DocLibrary.count; i++) {
-        if (myStrcmp(DocLibrary.docs[i].id, id) == 0) {
-            return i;
-        }
-    }
+    for (int i = 0; i < DocLibrary.count; i++)
+        if (!myStrcmp(DocLibrary.docs[i].id, id)) return i;
     return -1;
 }
 
-// 3. 添加文档
 void addDoc() {
-    if (DocLibrary.count >= MAX_DOCS) {
-        printf("? 文档库已满，无法添加！\n");
-        return;
-    }
-
-    Document newDoc;
-    printf("===== 新增文档 =====\n");
-    printf("请输入文档ID：");
-    scanf("%s", newDoc.id);
-    getchar(); // 吸收回车
-
-    // 判断ID是否重复
-    if (findDocById(newDoc.id) != -1) {
-        printf("? 文档ID已存在！\n");
-        return;
-    }
-
-    printf("请输入文档标题：");
-    fgets(newDoc.title, MAX_TITLE_LEN, stdin);
-    printf("请输入文档内容：");
-    fgets(newDoc.content, MAX_CONTENT_LEN, stdin);
-
-    // 存入文档库
-    DocLibrary.docs[DocLibrary.count] = newDoc;
+    if (DocLibrary.count >= MAX_DOCS) { printf("已满\n"); return; }
+    Document d;
+    printf("ID："); scanf("%s", d.id); getchar();
+    if (findDocById(d.id) != -1) { printf("ID重复\n"); return; }
+    printf("标题："); fgets(d.title, MAX_TITLE_LEN, stdin);
+    printf("内容："); fgets(d.content, MAX_CONTENT_LEN, stdin);
+    DocLibrary.docs[DocLibrary.count] = d;
+    // 为新文档建立索引
+    indexDocument(DocLibrary.count);
     DocLibrary.count++;
-    printf("? 文档添加成功！\n");
+    printf("添加成功\n");
 }
 
-// 4. 查看所有文档
 void showAllDocs() {
-    if (DocLibrary.count == 0) {
-        printf("?? 文档库为空！\n");
-        return;
-    }
-
-    printf("\n===== 所有文档（共%d篇）=====\n", DocLibrary.count);
-    for (int i = 0; i < DocLibrary.count; i++) {
-        printf("第%d篇\n", i + 1);
-        printf("ID：%s\n", DocLibrary.docs[i].id);
-        printf("标题：%s", DocLibrary.docs[i].title);
-        printf("内容：%s", DocLibrary.docs[i].content);
-        printf("------------------------\n");
-    }
+    if (!DocLibrary.count) { printf("空库\n"); return; }
+    for (int i = 0; i < DocLibrary.count; i++)
+        printf("ID:%s 标题:%s", DocLibrary.docs[i].id, DocLibrary.docs[i].title);
 }
 
-// 5. 修改文档
 void modifyDoc() {
-    char id[MAX_ID_LEN];
-    printf("请输入要修改的文档ID：");
-    scanf("%s", id);
+    char id[MAX_ID_LEN]; printf("ID："); scanf("%s", id);
     int idx = findDocById(id);
-
-    if (idx == -1) {
-        printf("? 未找到该文档！\n");
-        return;
-    }
-
-    getchar();
-    printf("===== 修改文档 =====\n");
-    printf("请输入新标题：");
-    fgets(DocLibrary.docs[idx].title, MAX_TITLE_LEN, stdin);
-    printf("请输入新内容：");
-    fgets(DocLibrary.docs[idx].content, MAX_CONTENT_LEN, stdin);
-    printf("? 修改成功！\n");
+    if (idx == -1) { printf("不存在\n"); return; }
+    getchar(); 
+    // 先从索引中删除旧文档
+    removeDocFromIndex(idx);
+    printf("新标题："); fgets(DocLibrary.docs[idx].title, MAX_TITLE_LEN, stdin);
+    printf("新内容："); fgets(DocLibrary.docs[idx].content, MAX_CONTENT_LEN, stdin);
+    // 重新索引修改后的文档
+    indexDocument(idx);
+    printf("修改成功\n");
 }
 
-// 6. 删除文档
 void deleteDoc() {
-    char id[MAX_ID_LEN];
-    printf("请输入要删除的文档ID：");
-    scanf("%s", id);
+    char id[MAX_ID_LEN]; printf("ID："); scanf("%s", id);
     int idx = findDocById(id);
-
-    if (idx == -1) {
-        printf("? 未找到该文档！\n");
-        return;
-    }
-
-    // 后面的文档向前覆盖
+    if (idx == -1) { printf("不存在\n"); return; }
+    // 先从索引中删除
+    removeDocFromIndex(idx);
+    // 删除文档
     for (int i = idx; i < DocLibrary.count - 1; i++) {
         DocLibrary.docs[i] = DocLibrary.docs[i + 1];
     }
     DocLibrary.count--;
-    printf("? 删除成功！\n");
+    // 重建索引（因为文档下标发生了变化）
+    rebuildIndex();
+    printf("删除成功\n");
 }
 
-// 7. 保存文档到文件
 void saveDocsToFile() {
-    FILE* fp = fopen(FILE_NAME, "w");
-    if (!fp) {
-        printf("? 文件打开失败！\n");
-        return;
-    }
-
-    // 写入数量 + 每篇文档
-    fprintf(fp, "%d\n", DocLibrary.count);
-    for (int i = 0; i < DocLibrary.count; i++) {
-        fprintf(fp, "%s\n", DocLibrary.docs[i].id);
-        fprintf(fp, "%s", DocLibrary.docs[i].title);
-        fprintf(fp, "%s", DocLibrary.docs[i].content);
-    }
-
-    fclose(fp);
-    printf("? 已保存到 %s\n", FILE_NAME);
+    FILE* f = fopen(FILE_NAME, "w");
+    if (!f) { printf("失败\n"); return; }
+    fprintf(f, "%d\n", DocLibrary.count);
+    for (int i = 0; i < DocLibrary.count; i++)
+        fprintf(f, "%s\n%s%s", DocLibrary.docs[i].id, DocLibrary.docs[i].title, DocLibrary.docs[i].content);
+    fclose(f); printf("保存成功\n");
 }
 
-// 8. 从文件加载文档
 void loadDocsFromFile() {
-    FILE* fp = fopen(FILE_NAME, "r");
-    if (!fp) {
-        printf("?? 未找到数据文件，创建新库\n");
-        return;
-    }
-
-    // 读取数量
-    fscanf(fp, "%d", &DocLibrary.count);
-    getchar();
-
+    FILE* f = fopen(FILE_NAME, "r");
+    if (!f) { printf("新建库\n"); return; }
+    fscanf(f, "%d", &DocLibrary.count); getchar();
     for (int i = 0; i < DocLibrary.count; i++) {
-        fgets(DocLibrary.docs[i].id, MAX_ID_LEN, fp);
-        // 去除换行
-        DocLibrary.docs[i].id[myStrlen(DocLibrary.docs[i].id) - 1] = '\0';
-
-        fgets(DocLibrary.docs[i].title, MAX_TITLE_LEN, fp);
-        fgets(DocLibrary.docs[i].content, MAX_CONTENT_LEN, fp);
+        fgets(DocLibrary.docs[i].id, MAX_ID_LEN, f);
+        DocLibrary.docs[i].id[myStrlen(DocLibrary.docs[i].id) - 1] = 0;
+        fgets(DocLibrary.docs[i].title, MAX_TITLE_LEN, f);
+        fgets(DocLibrary.docs[i].content, MAX_CONTENT_LEN, f);
     }
-
-    fclose(fp);
-    printf("? 从文件加载成功！\n");
+    fclose(f); 
+    // 加载完成后自动重建索引
+    rebuildIndex();
+    printf("加载成功\n");
 }
 
-// ===================== 版本2 新增：关键词检索功能 =====================
-void searchByKeyword() {
-    char key[MAX_KEY_LEN];
-    printf("===== 关键词检索 =====\n");
-    printf("请输入要搜索的关键词：");
-    getchar();
-    fgets(key, MAX_KEY_LEN, stdin);
+// 版本3原有线性检索
+void linearSearch() {
+    char input[500], keys[MAX_KEY_NUM][MAX_KEY_LEN];
+    printf("\n===== 线性检索 =====\n输入关键词（空格分隔）：");
+    getchar(); fgets(input, 500, stdin);
+    int n = splitKeys(input, keys);
+    if (!n) { printf("无关键词\n"); return; }
 
-    // 去掉fgets读取的换行符
-    int len = myStrlen(key);
-    if (len > 0 && key[len - 1] == '\n') {
-        key[len - 1] = '\0';
-    }
+    int mode;
+    printf("1-全部包含 2-任意包含："); scanf("%d", &mode);
 
-    int matchCount = 0;
+    int cnt = 0;
     printf("\n===== 检索结果 =====\n");
-
     for (int i = 0; i < DocLibrary.count; i++) {
-        // 同时匹配标题和内容
-        int titleMatch = containsKey(DocLibrary.docs[i].title, key);
-        int contentMatch = containsKey(DocLibrary.docs[i].content, key);
-
-        if (titleMatch || contentMatch) {
-            matchCount++;
-            printf("匹配文档 %d\n", matchCount);
-            printf("ID：%s\n", DocLibrary.docs[i].id);
-            printf("标题：%s", DocLibrary.docs[i].title);
-            printf("内容：%s", DocLibrary.docs[i].content);
-            printf("------------------------\n");
+        int ok = 1;
+        if (mode == 1) {
+            for (int k = 0; k < n; k++) {
+                if (!KMP(DocLibrary.docs[i].title, keys[k]) && !KMP(DocLibrary.docs[i].content, keys[k])) {
+                    ok = 0;
+                    break;
+                }
+            }
+        } else {
+            ok = 0;
+            for (int k = 0; k < n; k++) {
+                if (KMP(DocLibrary.docs[i].title, keys[k]) || KMP(DocLibrary.docs[i].content, keys[k])) {
+                    ok = 1;
+                    break;
+                }
+            }
+        }
+        if (ok) {
+            cnt++;
+            printf("匹配%d ID:%s 标题:%s", cnt, DocLibrary.docs[i].id, DocLibrary.docs[i].title);
         }
     }
+    printf("共匹配：%d\n", cnt);
+}
 
-    if (matchCount == 0) {
-        printf("?? 未找到包含关键词「%s」的文档\n", key);
-    } else {
-        printf("? 共找到 %d 篇匹配文档\n", matchCount);
+// BF/KMP算法对比测试
+void testAlgorithmPerformance() {
+    char text[MAX_CONTENT_LEN];
+    char pattern[] = "abcde";
+
+    for (int i = 0; i < MAX_CONTENT_LEN - 10; i++)
+        text[i] = 'a' + i % 26;
+    text[MAX_CONTENT_LEN - 1] = '\0';
+
+    text[MAX_CONTENT_LEN - 6] = 'a';
+    text[MAX_CONTENT_LEN - 5] = 'b';
+    text[MAX_CONTENT_LEN - 4] = 'c';
+    text[MAX_CONTENT_LEN - 3] = 'd';
+    text[MAX_CONTENT_LEN - 2] = 'e';
+
+    clock_t start, end;
+    long t1, t2;
+
+    printf("\n===== BF VS KMP 算法效率测试 =====\n");
+    printf("测试文本长度：%d\n", myStrlen(text));
+    printf("测试关键词长度：%d\n", myStrlen(pattern));
+
+    start = clock();
+    for (int i = 0; i < 10000; i++) {
+        // BF算法
+        int n = myStrlen(text), m = myStrlen(pattern);
+        int found = 0;
+        for (int i = 0; i <= n - m; i++) {
+            int j;
+            for (j = 0; j < m; j++)
+                if (text[i + j] != pattern[j]) break;
+            if (j == m) { found = 1; break; }
+        }
     }
+    end = clock();
+    t1 = end - start;
+    printf("BF 算法耗时：%ld\n", t1);
+
+    start = clock();
+    for (int i = 0; i < 10000; i++) KMP(text, pattern);
+    end = clock();
+    t2 = end - start;
+    printf("KMP 算法耗时：%ld\n", t2);
+
+    if (t2 < t1)
+        printf("? 结论：KMP 效率明显更高！\n");
+    else
+        printf("?  结论：短文本差距小\n");
 }
 
-// ===================== 菜单 =====================
+// ------------------------------
+// 菜单（版本4新增选项）
+// ------------------------------
 void showMenu() {
-    printf("\n========== 简易搜索引擎 - 版本2 ==========\n");
-    printf("1. 新增文档\n");
-    printf("2. 查看所有文档\n");
-    printf("3. 修改文档\n");
-    printf("4. 删除文档\n");
-    printf("5. 保存文档到文件\n");
-    printf("6. 从文件加载文档\n");
-    printf("7. 关键词检索 （新增）\n")；
-    printf("8. 多关键词检索\n");
-    printf("0. 退出程序\n");
-    printf("=========================================\n");
-    printf("请输入操作序号：");
+    printf("\n===== 简易搜索引擎 版本4：倒排索引 =====\n");
+    printf("1.新增文档  2.查看所有  3.修改文档  4.删除文档\n");
+    printf("5.保存文件  6.加载文件  7.线性检索  8.倒排索引检索\n");
+    printf("9.重建索引  10.BF/KMP对比  11.检索效率对比\n");
+    printf("0.退出\n选项：");
 }
 
-// ===================== 主函数 =====================
 int main() {
     initLibrary();
-    loadDocsFromFile(); // 启动自动加载
-
-    int choice;
+    initIndex();
+    loadDocsFromFile();
+    int op;
     while (1) {
         showMenu();
-        scanf("%d", &choice);
-
-        switch (choice) {
+        scanf("%d", &op);
+        switch (op) {
             case 1: addDoc(); break;
             case 2: showAllDocs(); break;
             case 3: modifyDoc(); break;
             case 4: deleteDoc(); break;
             case 5: saveDocsToFile(); break;
             case 6: loadDocsFromFile(); break;
-            case 7: searchByKeyword(); break;
-            case 8: searchMultiKey();break;
-            case 0:
-                printf("?? 程序退出\n");
-                return 0;
-            default:
-                printf("? 输入错误，请重试！\n");
+            case 7: linearSearch(); break;
+            case 8: indexSearch(); break;
+            case 9: rebuildIndex(); break;
+            case 10: testAlgorithmPerformance(); break;
+            case 11: testSearchPerformance(); break;
+            case 0: return 0;
+            default: printf("错误\n");
         }
     }
-    return 0;
 }
