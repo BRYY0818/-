@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 // ===================== 配置常量 =====================
 #define MAX_DOCS 100       // 最大文档数量
 #define MAX_ID_LEN 20      // 文档ID最大长度
 #define MAX_TITLE_LEN 100  // 标题最大长度
-#define MAX_CONTENT_LEN 1000 // 内容最大长度
+#define MAX_CONTENT_LEN 2000 // 内容最大长度
 #define MAX_KEY_LEN 50     // 关键词最大长度
 #define MAX_KEY_NUM 10     // 最多支持10个关键词
+#define MAX_INDEX_ITEMS 500  // 倒排索引最大词条数
+#define MAX_DOCS_PER_KEY 50  // 每个关键词最多关联文档数
 #define FILE_NAME "docs.txt" // 数据存储文件
 
 // ===================== 核心数据结构 =====================
@@ -23,6 +26,82 @@ struct {
     Document docs[MAX_DOCS];
     int count; // 当前有效文档数
 } DocLibrary;
+
+// ===================== 版本4 新增：倒排索引数据结构 =====================
+// 倒排索引项：关键词 + 关联的文档ID列表
+typedef struct {
+    char keyword[MAX_KEY_LEN];
+    int docIds[MAX_DOCS_PER_KEY];  // 存储文档在数组中的下标
+    int docCount;                  // 关联的文档数量
+} IndexItem;
+
+// 倒排索引表
+struct {
+    IndexItem items[MAX_INDEX_ITEMS];
+    int count;  // 当前词条数量
+} InvertedIndex;
+
+// ------------------------------
+// 工具函数
+// ------------------------------
+int myStrlen(const char* str) {
+    int len = 0;
+    while (str[len] != '\0') len++;
+    return len;
+}
+
+void myStrcpy(char* dest, const char* src) {
+    int i = 0;
+    while (src[i] != '\0') { dest[i] = src[i]; i++; }
+    dest[i] = '\0';
+}
+
+int myStrcmp(const char* a, const char* b) {
+    int i = 0;
+    while (a[i] && b[i] && a[i] == b[i]) i++;
+    return a[i] - b[i];
+}
+
+// 按空格分割字符串为关键词
+int splitKeys(char* in, char k[MAX_KEY_NUM][MAX_KEY_LEN]) {
+    int c = 0, idx = 0, len = myStrlen(in);
+    for (int i = 0; i < len && c < MAX_KEY_NUM; i++) {
+        if (in[i] == ' ' || in[i] == '\n' || in[i] == '\t') {
+            if (idx) { k[c][idx] = 0; c++; idx = 0; }
+        } else k[c][idx++] = in[i];
+    }
+    if (idx && c < MAX_KEY_NUM) { k[c][idx] = 0; c++; }
+    return c;
+}
+
+// KMP算法（默认字符串匹配）
+void getNext(const char* pat, int* next) {
+    int m = myStrlen(pat);
+    next[0] = -1;
+    int i = 0, j = -1;
+    while (i < m) {
+        if (j == -1 || pat[i] == pat[j]) {
+            i++; j++; next[i] = j;
+        } else j = next[j];
+    }
+}
+
+int KMP(const char* text, const char* pat) {
+    int n = myStrlen(text);
+    int m = myStrlen(pat);
+    if (m == 0 || m > n) return 0;
+
+    int next[100];
+    getNext(pat, next);
+
+    int i = 0, j = 0;
+    while (i < n && j < m) {
+        if (j == -1 || text[i] == pat[j]) {
+            i++; j++;
+        } else j = next[j];
+    }
+    return (j == m) ? 1 : 0;
+}
 
 // ===================== 自定义工具函数（无STL） =====================
 // 计算字符串长度
