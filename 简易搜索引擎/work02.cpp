@@ -103,6 +103,202 @@ int KMP(const char* text, const char* pat) {
     return (j == m) ? 1 : 0;
 }
 
+// ===================== 版本4 新增：倒排索引核心函数 =====================
+// 初始化倒排索引
+void initIndex() {
+    InvertedIndex.count = 0;
+}
+
+// 查找关键词在索引中的位置，不存在返回-1
+int findIndexItem(const char* keyword) {
+    for (int i = 0; i < InvertedIndex.count; i++) {
+        if (myStrcmp(InvertedIndex.items[i].keyword, keyword) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// 向索引中添加一个关键词-文档映射
+void addToIndex(const char* keyword, int docIdx) {
+    int idx = findIndexItem(keyword);
+    if (idx == -1) {
+        // 关键词不存在，新建索引项
+        if (InvertedIndex.count >= MAX_INDEX_ITEMS) return;
+        myStrcpy(InvertedIndex.items[InvertedIndex.count].keyword, keyword);
+        InvertedIndex.items[InvertedIndex.count].docIds[0] = docIdx;
+        InvertedIndex.items[InvertedIndex.count].docCount = 1;
+        InvertedIndex.count++;
+    } else {
+        // 关键词已存在，检查文档是否已关联
+        IndexItem* item = &InvertedIndex.items[idx];
+        for (int i = 0; i < item->docCount; i++) {
+            if (item->docIds[i] == docIdx) return;
+        }
+        // 添加新的文档关联
+        if (item->docCount < MAX_DOCS_PER_KEY) {
+            item->docIds[item->docCount] = docIdx;
+            item->docCount++;
+        }
+    }
+}
+
+// 为单篇文档建立索引
+void indexDocument(int docIdx) {
+    Document* doc = &DocLibrary.docs[docIdx];
+    char keys[MAX_KEY_NUM][MAX_KEY_LEN];
+    
+    // 索引标题
+    char titleCopy[MAX_TITLE_LEN];
+    myStrcpy(titleCopy, doc->title);
+    int titleKeyNum = splitKeys(titleCopy, keys);
+    for (int i = 0; i < titleKeyNum; i++) {
+        addToIndex(keys[i], docIdx);
+    }
+    
+    // 索引内容
+    char contentCopy[MAX_CONTENT_LEN];
+    myStrcpy(contentCopy, doc->content);
+    int contentKeyNum = splitKeys(contentCopy, keys);
+    for (int i = 0; i < contentKeyNum; i++) {
+        addToIndex(keys[i], docIdx);
+    }
+}
+
+// 重建整个倒排索引
+void rebuildIndex() {
+    initIndex();
+    for (int i = 0; i < DocLibrary.count; i++) {
+        indexDocument(i);
+    }
+    printf("? 倒排索引重建完成，共%d个词条\n", InvertedIndex.count);
+}
+
+// 从索引中删除文档
+void removeDocFromIndex(int docIdx) {
+    for (int i = 0; i < InvertedIndex.count; i++) {
+        IndexItem* item = &InvertedIndex.items[i];
+        int j;
+        for (j = 0; j < item->docCount; j++) {
+            if (item->docIds[j] == docIdx) break;
+        }
+        if (j < item->docCount) {
+            // 前移覆盖
+            for (int k = j; k < item->docCount - 1; k++) {
+                item->docIds[k] = item->docIds[k + 1];
+            }
+            item->docCount--;
+        }
+    }
+}
+
+// ===================== 版本4 新增：基于倒排索引的检索 =====================
+// 获取单个关键词的匹配文档列表
+int getDocsByKeyword(const char* keyword, int result[], int maxResult) {
+    int idx = findIndexItem(keyword);
+    if (idx == -1) return 0;
+    
+    IndexItem* item = &InvertedIndex.items[idx];
+    int count = (item->docCount < maxResult) ? item->docCount : maxResult;
+    for (int i = 0; i < count; i++) {
+        result[i] = item->docIds[i];
+    }
+    return count;
+}
+
+// 多关键词与检索（交集）
+int indexSearchAnd(char keys[MAX_KEY_NUM][MAX_KEY_LEN], int keyNum, int result[], int maxResult) {
+    if (keyNum == 0) return 0;
+    
+    int temp[MAX_DOCS];
+    int count = getDocsByKeyword(keys[0], temp, MAX_DOCS);
+    
+    for (int i = 1; i < keyNum; i++) {
+        int current[MAX_DOCS];
+        int currentCount = getDocsByKeyword(keys[i], current, MAX_DOCS);
+        
+        // 求交集
+        int newCount = 0;
+        for (int j = 0; j < count; j++) {
+            for (int k = 0; k < currentCount; k++) {
+                if (temp[j] == current[k]) {
+                    temp[newCount++] = temp[j];
+                    break;
+                }
+            }
+        }
+        count = newCount;
+        if (count == 0) break;
+    }
+    
+    // 复制结果
+    int finalCount = (count < maxResult) ? count : maxResult;
+    for (int i = 0; i < finalCount; i++) {
+        result[i] = temp[i];
+    }
+    return finalCount;
+}
+
+// 多关键词或检索（并集）
+int indexSearchOr(char keys[MAX_KEY_NUM][MAX_KEY_LEN], int keyNum, int result[], int maxResult) {
+    int temp[MAX_DOCS] = {0};
+    int count = 0;
+    
+    for (int i = 0; i < keyNum; i++) {
+        int current[MAX_DOCS];
+        int currentCount = getDocsByKeyword(keys[i], current, MAX_DOCS);
+        
+        // 求并集
+        for (int j = 0; j < currentCount; j++) {
+            int exists = 0;
+            for (int k = 0; k < count; k++) {
+                if (temp[k] == current[j]) {
+                    exists = 1;
+                    break;
+                }
+            }
+            if (!exists && count < MAX_DOCS) {
+                temp[count++] = current[j];
+            }
+        }
+    }
+    
+    // 复制结果
+    int finalCount = (count < maxResult) ? count : maxResult;
+    for (int i = 0; i < finalCount; i++) {
+        result[i] = temp[i];
+    }
+    return finalCount;
+}
+
+// 倒排索引检索入口
+void indexSearch() {
+    char input[500], keys[MAX_KEY_NUM][MAX_KEY_LEN];
+    printf("\n===== 倒排索引检索 =====\n输入关键词（空格分隔）：");
+    getchar(); fgets(input, 500, stdin);
+    int n = splitKeys(input, keys);
+    if (!n) { printf("无关键词\n"); return; }
+
+    int mode;
+    printf("1-全部包含(AND) 2-任意包含(OR)："); scanf("%d", &mode);
+
+    int result[MAX_DOCS];
+    int matchCount;
+    
+    if (mode == 1) {
+        matchCount = indexSearchAnd(keys, n, result, MAX_DOCS);
+    } else {
+        matchCount = indexSearchOr(keys, n, result, MAX_DOCS);
+    }
+
+    printf("\n===== 检索结果 =====\n");
+    for (int i = 0; i < matchCount; i++) {
+        int docIdx = result[i];
+        printf("匹配%d ID:%s 标题:%s", i+1, DocLibrary.docs[docIdx].id, DocLibrary.docs[docIdx].title);
+    }
+    printf("共匹配：%d\n", matchCount);
+}
+
 // ===================== 自定义工具函数（无STL） =====================
 // 计算字符串长度
 int myStrlen(const char* str) {
