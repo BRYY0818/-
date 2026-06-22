@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 
 // ===================== 配置常量 =====================
 #define MAX_DOCS 100       // 最大文档数量
@@ -11,6 +12,8 @@
 #define MAX_KEY_NUM 10     // 最多支持10个关键词
 #define MAX_INDEX_ITEMS 500  // 倒排索引最大词条数
 #define MAX_DOCS_PER_KEY 50  // 每个关键词最多关联文档数
+#define MAX_RECOMMEND 5  // 最多推荐5篇相关文档
+#define SIMILARITY_THRESHOLD 2  // 相似度阈值，共同关键词>=2则建立边
 #define FILE_NAME "docs.txt" // 数据存储文件
 
 // ===================== 核心数据结构 =====================
@@ -41,6 +44,17 @@ struct {
     int count;  // 当前词条数量
 } InvertedIndex;
 
+// ===================== 版本5 新增：图数据结构 =====================
+// 文档关联图：邻接矩阵存储，值为相似度（共同关键词数量）
+int docGraph[MAX_DOCS][MAX_DOCS];
+
+// 关键词共现图：邻接矩阵存储，值为共现次数
+int keywordGraph[MAX_INDEX_ITEMS][MAX_INDEX_ITEMS];
+
+// 图遍历访问标记
+int visited[MAX_DOCS];
+
+
 // ------------------------------
 // 工具函数
 // ------------------------------
@@ -62,13 +76,25 @@ int myStrcmp(const char* a, const char* b) {
     return a[i] - b[i];
 }
 
-// 按空格分割字符串为关键词
-int splitKeys(char* in, char k[MAX_KEY_NUM][MAX_KEY_LEN]) {
+// 中文分词（简单实现：按空格、标点分割）(版本5修改）
+int splitChinese(char* in, char k[MAX_KEY_NUM][MAX_KEY_LEN]) {
     int c = 0, idx = 0, len = myStrlen(in);
+    char separators[] = " ,.!?，。！？；：;:";
+    
     for (int i = 0; i < len && c < MAX_KEY_NUM; i++) {
-        if (in[i] == ' ' || in[i] == '\n' || in[i] == '\t') {
+        int isSep = 0;
+        for (int j = 0; separators[j] != '\0'; j++) {
+            if (in[i] == separators[j]) {
+                isSep = 1;
+                break;
+            }
+        }
+        
+        if (isSep) {
             if (idx) { k[c][idx] = 0; c++; idx = 0; }
-        } else k[c][idx++] = in[i];
+        } else {
+            k[c][idx++] = in[i];
+        }
     }
     if (idx && c < MAX_KEY_NUM) { k[c][idx] = 0; c++; }
     return c;
