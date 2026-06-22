@@ -325,6 +325,212 @@ void indexSearch() {
     printf("共匹配：%d\n", matchCount);
 }
 
+// ===================== 版本5 新增：图算法核心函数 =====================
+// 计算两篇文档的相似度（共同关键词数量）
+int calcDocSimilarity(int doc1, int doc2) {
+    if (doc1 == doc2) return 0;
+    
+    int common = 0;
+    for (int i = 0; i < InvertedIndex.count; i++) {
+        IndexItem* item = &InvertedIndex.items[i];
+        int has1 = 0, has2 = 0;
+        for (int j = 0; j < item->docCount; j++) {
+            if (item->docIds[j] == doc1) has1 = 1;
+            if (item->docIds[j] == doc2) has2 = 1;
+        }
+        if (has1 && has2) common++;
+    }
+    return common;
+}
+
+// 构建文档关联图
+void buildDocGraph() {
+    // 初始化图
+    for (int i = 0; i < MAX_DOCS; i++) {
+        for (int j = 0; j < MAX_DOCS; j++) {
+            docGraph[i][j] = 0;
+        }
+    }
+    
+    // 计算所有文档对的相似度
+    for (int i = 0; i < DocLibrary.count; i++) {
+        for (int j = i+1; j < DocLibrary.count; j++) {
+            int sim = calcDocSimilarity(i, j);
+            if (sim >= SIMILARITY_THRESHOLD) {
+                docGraph[i][j] = sim;
+                docGraph[j][i] = sim; // 无向图
+            }
+        }
+    }
+    
+    printf("✅ 文档关联图构建完成\n");
+    printf("📊 文档数：%d，边数：", DocLibrary.count);
+    int edgeCount = 0;
+    for (int i = 0; i < DocLibrary.count; i++) {
+        for (int j = i+1; j < DocLibrary.count; j++) {
+            if (docGraph[i][j] > 0) edgeCount++;
+        }
+    }
+    printf("%d\n", edgeCount);
+}
+
+// DFS深度优先遍历，收集相关文档
+void dfsRecommend(int docIdx, int recommend[], int* recCount) {
+    visited[docIdx] = 1;
+    
+    // 遍历所有相邻节点
+    for (int i = 0; i < DocLibrary.count; i++) {
+        if (docGraph[docIdx][i] > 0 && !visited[i] && *recCount < MAX_RECOMMEND) {
+            recommend[*recCount] = i;
+            (*recCount)++;
+            dfsRecommend(i, recommend, recCount);
+        }
+    }
+}
+
+// 基于图的相关文档推荐
+void recommendSimilarDocs() {
+    char id[MAX_ID_LEN];
+    printf("请输入要推荐的文档ID：");
+    scanf("%s", id);
+    
+    int docIdx = -1;
+    for (int i = 0; i < DocLibrary.count; i++) {
+        if (myStrcmp(DocLibrary.docs[i].id, id) == 0) {
+            docIdx = i;
+            break;
+        }
+    }
+    
+    if (docIdx == -1) {
+        printf("❌ 未找到该文档\n");
+        return;
+    }
+    
+    // 构建图
+    buildDocGraph();
+    
+    // 初始化访问标记
+    for (int i = 0; i < MAX_DOCS; i++) {
+        visited[i] = 0;
+    }
+    
+    int recommend[MAX_RECOMMEND];
+    int recCount = 0;
+    
+    // DFS推荐
+    dfsRecommend(docIdx, recommend, &recCount);
+    
+    printf("\n===== 相关文档推荐 =====\n");
+    printf("目标文档：%s - %s", DocLibrary.docs[docIdx].id, DocLibrary.docs[docIdx].title);
+    
+    if (recCount == 0) {
+        printf("❌ 没有找到相关文档\n");
+        return;
+    }
+    
+    for (int i = 0; i < recCount; i++) {
+        int idx = recommend[i];
+        printf("推荐%d：%s - %s", i+1, DocLibrary.docs[idx].id, DocLibrary.docs[idx].title);
+        printf("相似度：%d\n", docGraph[docIdx][idx]);
+    }
+}
+
+// 构建关键词共现图
+void buildKeywordGraph() {
+    // 初始化图
+    for (int i = 0; i < MAX_INDEX_ITEMS; i++) {
+        for (int j = 0; j < MAX_INDEX_ITEMS; j++) {
+            keywordGraph[i][j] = 0;
+        }
+    }
+    
+    // 遍历所有文档，统计关键词共现
+    for (int d = 0; d < DocLibrary.count; d++) {
+        char keys[MAX_KEY_NUM][MAX_KEY_LEN];
+        char contentCopy[MAX_CONTENT_LEN];
+        myStrcpy(contentCopy, DocLibrary.docs[d].content);
+        int keyNum = splitChinese(contentCopy, keys);
+        
+        // 统计该文档中所有关键词对的共现
+        for (int i = 0; i < keyNum; i++) {
+            int idx1 = findIndexItem(keys[i]);
+            if (idx1 == -1) continue;
+            
+            for (int j = i+1; j < keyNum; j++) {
+                int idx2 = findIndexItem(keys[j]);
+                if (idx2 == -1) continue;
+                
+                keywordGraph[idx1][idx2]++;
+                keywordGraph[idx2][idx1]++;
+            }
+        }
+    }
+    
+    printf("✅ 关键词共现图构建完成\n");
+}
+
+// 相关关键词推荐
+void recommendKeywords() {
+    char keyword[MAX_KEY_LEN];
+    printf("请输入关键词：");
+    scanf("%s", keyword);
+    
+    int idx = findIndexItem(keyword);
+    if (idx == -1) {
+        printf("❌ 未找到该关键词\n");
+        return;
+    }
+    
+    buildKeywordGraph();
+    
+    printf("\n===== 相关关键词推荐 =====\n");
+    printf("目标关键词：%s\n", keyword);
+    
+    int found = 0;
+    for (int i = 0; i < InvertedIndex.count; i++) {
+        if (keywordGraph[idx][i] > 0) {
+            printf("%s (共现%d次)\n", InvertedIndex.items[i].keyword, keywordGraph[idx][i]);
+            found = 1;
+        }
+    }
+    
+    if (!found) {
+        printf("❌ 没有找到相关关键词\n");
+    }
+}
+
+// 可视化文档关联图
+void showDocGraph() {
+    buildDocGraph();
+    
+    printf("\n===== 文档关联图邻接矩阵 =====\n");
+    printf("   ");
+    for (int i = 0; i < DocLibrary.count; i++) {
+        printf("%3d", i);
+    }
+    printf("\n");
+    
+    for (int i = 0; i < DocLibrary.count; i++) {
+        printf("%3d", i);
+        for (int j = 0; j < DocLibrary.count; j++) {
+            printf("%3d", docGraph[i][j]);
+        }
+        printf("\n");
+    }
+    
+    printf("\n===== 文档关联图拓扑结构 =====\n");
+    for (int i = 0; i < DocLibrary.count; i++) {
+        printf("文档%d(%s) 连接：", i, DocLibrary.docs[i].id);
+        for (int j = 0; j < DocLibrary.count; j++) {
+            if (docGraph[i][j] > 0) {
+                printf("文档%d(相似度%d) ", j, docGraph[i][j]);
+            }
+        }
+        printf("\n");
+    }
+}
+
 // ===================== 版本4 新增：检索效率对比测试 =====================
 void testSearchPerformance() {
     // 先重建索引
